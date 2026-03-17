@@ -79,7 +79,7 @@ function scheduleInOrder(cases: CaseInput[], day: DayWindow, turnover: number): 
     const otIndex = best!.otIndex
     const startMinute = best!.start
     const endMinute = startMinute + c.durationMinutes
-    perOT[otIndex].list.push({ ...c, otIndex, startMinute, endMinute })
+    perOT[otIndex].list.push({ ...c, otIndex, startMinute, endMinute, dayIndex: 0 })
     addResource(resources, startMinute, endMinute, c.surgeon, c.equipment)
   }
 

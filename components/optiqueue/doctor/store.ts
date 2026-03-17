@@ -22,7 +22,7 @@ export function useDoctorDay(surgeonId: string, date: string) {
   const { data, mutate, isLoading: swrLoading } = useSWR<DoctorDayData>(
     // Always fetch, but use a default if surgeonId is empty
     surgeonId ? [DOCTOR_DAY_KEY, surgeonId, date] : null,
-    async ([, sid, d]) => {
+    async ([, sid, d]: [string, string, string]) => {
       // In real app, this would fetch from API: `/doctor/${sid}/day?date=${d}`
       return generateDoctorDayData(sid, d)
     },
