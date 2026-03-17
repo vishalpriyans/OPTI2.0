@@ -295,10 +295,7 @@ function AdminMain() {
       {/* 4. AI Insights */}
       <AIInsightsPanel />
 
-      {/* 5. Cases Table */}
-      <CasesTable />
-
-      {/* 6. Gantt Timeline */}
+      {/* 5. Gantt Timeline */}
       <div className="control-tower-card p-6 border-2 border-primary/20">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -334,6 +331,9 @@ function AdminMain() {
           )}
         </div>
       </div>
+
+      {/* 6. Cases Table */}
+      <CasesTable />
 
       {/* 7. AI Command Center */}
       <AICommandCenter />
