@@ -190,7 +190,7 @@ export default function DoctorLoginPage() {
                   <span>HIPAA Compliant</span>
                 </div>
                 <div className="w-px h-3 bg-gray-300"></div>
-                <span>© 2025 OptiQueue</span>
+                <span>© 2026 OptiQueue</span>
               </div>
             </div>
           </div>
