@@ -14,6 +14,19 @@ import { AlertTriangle, Activity, ChevronDown, ChevronUp } from "lucide-react"
 import { SURGEONS, EQUIPMENT } from "./sample-data"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import { useSchedule } from "./store"
+import type { ScheduledCase } from "./types"
+
+// ── Constants (all times are offsets from 07:00 AM) ──────────────────────────
+const DAY_START = 0    // 07:00 AM
+const DAY_END   = 600  // 05:00 PM  (10h × 60)
+const BUCKET_SIZE = 60 // 1 hour per bucket
+const BUCKETS = Array.from({ length: (DAY_END - DAY_START) / BUCKET_SIZE }, (_, i) => {
+  const offsetMin = i * BUCKET_SIZE
+  const hour = 7 + Math.floor(offsetMin / 60)
+  const label = `${hour.toString().padStart(2, "0")}:00`
+  return { label, start: offsetMin, end: offsetMin + BUCKET_SIZE }
+})
 
 const RANGE_OPTIONS = [
   { label: "Day", value: "day" },
@@ -138,7 +151,7 @@ function UtilizationSection({ mode }: { mode: Mode }) {
     includeTurnover: mode === "doctor" ? includeTurnover : undefined,
   }), [surgeonId, equipmentId, otId, includeTurnover, mode])
 
-  const { data, isLoading, error } = useUtilizationData({ mode, range, bucket, filters })
+  const { data, isLoading, error, isEmpty } = useUtilizationData({ mode, range, bucket, filters })
 
   const chartData = data?.points ?? []
   const summary = data?.summary
@@ -246,20 +259,34 @@ function UtilizationSection({ mode }: { mode: Mode }) {
               Failed to load utilization data.
             </div>
           ) : (
-            <div className="w-full h-[280px]">
+            <div className="relative w-full h-[280px]">
+              {/* Empty schedule overlay */}
+              {isEmpty && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-card/80 rounded-lg">
+                  <Activity className="h-6 w-6 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No surgeries scheduled — add cases to see utilization data.</p>
+                </div>
+              )}
+              {/* Weekly/Monthly coming soon overlay */}
+              {(range === "week" || range === "month") && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-card/80 rounded-lg">
+                  <p className="text-sm font-medium text-muted-foreground">Showing daily data</p>
+                  <p className="text-xs text-muted-foreground/60">Weekly / Monthly view coming soon</p>
+                </div>
+              )}
               <ChartContainer config={CHART_CONFIG} className="w-full h-full">
                 <LineChart data={chartData} onClick={handleDrilldown}>
                   <CartesianGrid strokeDasharray="4 4" stroke="rgba(148,163,184,0.25)" />
-                  <XAxis 
-                    dataKey="x" 
-                    tickLine={false} 
-                    axisLine={false} 
+                  <XAxis
+                    dataKey="x"
+                    tickLine={false}
+                    axisLine={false}
                     dy={8}
                     tick={{ fontSize: 12 }}
                   />
-                  <YAxis 
-                    domain={[0, 110]} 
-                    tickLine={false} 
+                  <YAxis
+                    domain={[0, 110]}
+                    tickLine={false}
                     axisLine={false}
                     tick={{ fontSize: 12 }}
                     width={40}
@@ -409,89 +436,78 @@ function computeRemarks(mode: Mode, series?: UtilizationSeries): Remark[] {
   return remarks
 }
 
+/** Compute overlap (in minutes) between a case and a bucket window */
+function overlapMinutes(caseStart: number, caseEnd: number, bucketStart: number, bucketEnd: number): number {
+  return Math.max(0, Math.min(caseEnd, bucketEnd) - Math.max(caseStart, bucketStart))
+}
+
+/** Build a UtilizationSeries from a list of cases for one entity (surgeon or equipment) */
+function buildSeries(cases: ScheduledCase[]): UtilizationSeries {
+  const points: UtilizationPoint[] = BUCKETS.map(({ label, start, end }) => {
+    const busy = cases.reduce((sum, c) => sum + overlapMinutes(c.startMinute, c.endMinute, start, end), 0)
+    const capped = Math.min(busy, BUCKET_SIZE)
+    const utilization = Math.round((capped / BUCKET_SIZE) * 100)
+    return {
+      x: label,
+      utilization,
+      busyMinutes: capped,
+      availableMinutes: BUCKET_SIZE,
+      meta: {
+        bucketStartISO: new Date(new Date().setHours(7 + Math.floor(start / 60), start % 60, 0, 0)).toISOString(),
+        bucketEndISO:   new Date(new Date().setHours(7 + Math.floor(end   / 60), end   % 60, 0, 0)).toISOString(),
+      },
+    }
+  })
+
+  const utilValues = points.map(p => p.utilization)
+  const averageUtilization = utilValues.length
+    ? Math.round(utilValues.reduce((s, v) => s + v, 0) / utilValues.length * 10) / 10
+    : 0
+  const peakUtilization = utilValues.length ? Math.max(...utilValues) : 0
+  const totalBusyMinutes = points.reduce((s, p) => s + p.busyMinutes, 0)
+  const totalAvailableMinutes = BUCKETS.length * BUCKET_SIZE
+  const overtimeMinutes = cases.reduce((sum, c) => sum + Math.max(0, c.endMinute - DAY_END), 0)
+
+  return { points, summary: { totalBusyMinutes, totalAvailableMinutes, averageUtilization, peakUtilization, overtimeMinutes } }
+}
+
 function useUtilizationData(key: FetchKey) {
-  // For instant loading, return sample data immediately without API calls
-  // In production, you would implement proper caching and API optimization
-  
-  const sampleData = useMemo(() => {
-    const baseData = key.mode === "doctor" ? SAMPLE_DOCTOR_DATA : SAMPLE_EQUIPMENT_DATA
-    
-    // Generate dynamic data based on filters for more realistic behavior
-    if (key.filters.surgeonId && key.mode === "doctor") {
-      // Simulate surgeon-specific data
-      return {
-        ...baseData,
-        points: baseData.points.map(point => ({
-          ...point,
-          utilization: Math.max(20, point.utilization + (Math.random() - 0.5) * 20),
-          busyMinutes: Math.floor(point.busyMinutes * (0.8 + Math.random() * 0.4))
-        })),
-        summary: {
-          ...baseData.summary,
-          averageUtilization: 60 + Math.random() * 25,
-          peakUtilization: 75 + Math.random() * 20
-        }
-      }
+  const { schedule } = useSchedule()
+
+  const data = useMemo<UtilizationSeries>(() => {
+    const cases: ScheduledCase[] = schedule?.optimized?.cases ?? []
+
+    // Empty schedule — return all-zero series
+    if (!cases.length) {
+      const points: UtilizationPoint[] = BUCKETS.map(({ label, start, end }) => ({
+        x: label,
+        utilization: 0,
+        busyMinutes: 0,
+        availableMinutes: BUCKET_SIZE,
+        meta: {
+          bucketStartISO: new Date(new Date().setHours(7 + Math.floor(start / 60), start % 60, 0, 0)).toISOString(),
+          bucketEndISO:   new Date(new Date().setHours(7 + Math.floor(end   / 60), end   % 60, 0, 0)).toISOString(),
+        },
+      }))
+      return { points, summary: { totalBusyMinutes: 0, totalAvailableMinutes: BUCKETS.length * BUCKET_SIZE, averageUtilization: 0, peakUtilization: 0, overtimeMinutes: 0 } }
     }
-    
-    if (key.filters.equipmentId && key.mode === "equipment") {
-      // Simulate equipment-specific data
-      return {
-        ...baseData,
-        points: baseData.points.map(point => ({
-          ...point,
-          utilization: Math.max(15, point.utilization + (Math.random() - 0.5) * 30),
-          busyMinutes: Math.floor(point.busyMinutes * (0.7 + Math.random() * 0.6))
-        })),
-        summary: {
-          ...baseData.summary,
-          averageUtilization: 55 + Math.random() * 30,
-          peakUtilization: 70 + Math.random() * 25
-        }
-      }
+
+    if (key.mode === "doctor") {
+      // Filter to specific surgeon if selected, else aggregate all
+      const filtered = key.filters.surgeonId
+        ? cases.filter(c => c.surgeon === key.filters.surgeonId)
+        : cases
+      return buildSeries(filtered)
+    } else {
+      // Equipment mode
+      const filtered = key.filters.equipmentId
+        ? cases.filter(c => c.equipment === key.filters.equipmentId)
+        : cases
+      return buildSeries(filtered)
     }
-    
-    return baseData
-  }, [key.mode, key.filters.surgeonId, key.filters.equipmentId])
+  }, [schedule, key.mode, key.filters.surgeonId, key.filters.equipmentId])
 
-  // Return data immediately for instant loading
-  return { 
-    data: sampleData, 
-    error: null, 
-    isLoading: false 
-  }
-}
+  const isEmpty = !(schedule?.optimized?.cases?.length)
 
-const SAMPLE_DOCTOR_DATA: UtilizationSeries = {
-  points: [
-    { x: "07:00", utilization: 42, busyMinutes: 120, availableMinutes: 280 },
-    { x: "09:00", utilization: 65, busyMinutes: 180, availableMinutes: 280 },
-    { x: "11:00", utilization: 88, busyMinutes: 245, availableMinutes: 280 },
-    { x: "13:00", utilization: 74, busyMinutes: 210, availableMinutes: 280 },
-    { x: "15:00", utilization: 52, busyMinutes: 160, availableMinutes: 280 },
-  ],
-  summary: {
-    totalBusyMinutes: 915,
-    totalAvailableMinutes: 1400,
-    averageUtilization: 64.2,
-    peakUtilization: 88,
-    overtimeMinutes: 45,
-  },
-}
-
-const SAMPLE_EQUIPMENT_DATA: UtilizationSeries = {
-  points: [
-    { x: "Mon", utilization: 72, busyMinutes: 360, availableMinutes: 480 },
-    { x: "Tue", utilization: 91, busyMinutes: 430, availableMinutes: 480 },
-    { x: "Wed", utilization: 54, busyMinutes: 260, availableMinutes: 480 },
-    { x: "Thu", utilization: 63, busyMinutes: 300, availableMinutes: 480 },
-    { x: "Fri", utilization: 48, busyMinutes: 230, availableMinutes: 480 },
-  ],
-  summary: {
-    totalBusyMinutes: 1580,
-    totalAvailableMinutes: 2400,
-    averageUtilization: 65.6,
-    peakUtilization: 91,
-    overtimeMinutes: 30,
-  },
+  return { data, error: null, isLoading: false, isEmpty }
 }

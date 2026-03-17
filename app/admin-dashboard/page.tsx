@@ -32,7 +32,7 @@ import { initializeSampleNotifications } from "@/components/optiqueue/notificati
 import { AICommandCenter } from "@/components/optiqueue/ai-command-center"
 import { AIInsightsPanel } from "@/components/optiqueue/ai-insights-panel"
 import { useToast } from "@/components/ui/use-toast"
-import { LogOut, User, Stethoscope } from "lucide-react"
+import { LogOut, User, Stethoscope, Zap, BarChart2, Trash2 } from "lucide-react"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -57,6 +57,108 @@ function getPriorityDot(priority: number): string {
     case 4: return "bg-blue-500"
     default: return "bg-green-500"
   }
+}
+
+// ── Quick Actions Header Buttons ─────────────────────────────────────────────
+
+function QuickActionsMenu() {
+  const { setSurgeries } = useSurgeries()
+  const { setSchedule, setDelayedIds } = useSchedule()
+  const { setWeeklySchedule } = useWeeklySchedule()
+  const { toast } = useToast()
+  const [loadingReal, setLoadingReal] = useState(false)
+
+  const onLoadRealDataset = useCallback(async () => {
+    setLoadingReal(true)
+    try {
+      const cases = await loadRealDataset(10)
+      setSurgeries(cases)
+      setWeeklySchedule(undefined)
+      setDelayedIds(new Set())
+      const optimized = optimizeSchedule(cases, DEFAULT_DAY, TURNOVER_MINUTES)
+      const baseline  = baselineSchedule(cases, DEFAULT_DAY, TURNOVER_MINUTES)
+      setSchedule({ optimized, baseline, kpis: computeKPIs(optimized, baseline, DEFAULT_DAY) })
+      const emergencyCount = cases.filter(c => c.priority === 1).length
+      toast({
+        title: "Dataset loaded & scheduled",
+        description: `${cases.length} random cases · ${emergencyCount} emergency · conflicts auto-detected`,
+      })
+    } catch {
+      toast({ title: "Failed to load dataset", variant: "destructive" })
+    } finally {
+      setLoadingReal(false)
+    }
+  }, [setSurgeries, setWeeklySchedule, setDelayedIds, setSchedule, toast])
+
+  const onClear = useCallback(() => {
+    setSurgeries([])
+    setSchedule(undefined)
+    setWeeklySchedule(undefined)
+    setDelayedIds(new Set())
+    toast({ title: "All data cleared" })
+  }, [setSurgeries, setSchedule, setWeeklySchedule, setDelayedIds, toast])
+
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative h-8 w-8 rounded-full"
+        title="Load 10 Random Cases"
+        onClick={onLoadRealDataset}
+        disabled={loadingReal}
+      >
+        {loadingReal ? (
+          <span className="relative flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500" />
+          </span>
+        ) : (
+          <Zap className="h-4 w-4" />
+        )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+        title="Clear All Data"
+        onClick={onClear}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
+// ── Utilization Header Dropdown ───────────────────────────────────────────────
+
+function UtilizationMenu() {
+  const [open, setOpen] = useState(false)
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-8 px-3 rounded-full flex items-center gap-1.5" title="Utilization Analysis">
+          <BarChart2 className="h-4 w-4" />
+          <span className="text-sm font-medium">Utilization Analysis</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-[680px] max-h-[80vh] overflow-y-auto p-3"
+        onCloseAutoFocus={e => e.preventDefault()}
+      >
+        <DropdownMenuLabel className="flex items-center gap-2 pb-2">
+          <BarChart2 className="h-4 w-4 text-indigo-600" />
+          <div>
+            <p className="text-sm font-bold text-indigo-800">Utilization Analysis</p>
+            <p className="text-xs text-indigo-500">OT usage trends and resource metrics</p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="mb-2" />
+        <UtilizationDashboard />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 }
 
 // ── Main wrapper ─────────────────────────────────────────────────────────────
@@ -89,6 +191,8 @@ function AdminDashboardContent() {
         </div>
         <div className="flex items-center gap-3">
           <NotificationPanel />
+          <QuickActionsMenu />
+          <UtilizationMenu />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 rounded-full">
@@ -139,45 +243,11 @@ function AdminDashboardContent() {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 function AdminSidebar() {
-  const { surgeries, setSurgeries } = useSurgeries()
-  const { schedule, setSchedule, delayedIds, setDelayedIds } = useSchedule()
-  const { weeklySchedule, setWeeklySchedule } = useWeeklySchedule()
+  const { surgeries } = useSurgeries()
+  const { setSchedule, delayedIds, setDelayedIds } = useSchedule()
   const { toast } = useToast()
-  const [loadingReal, setLoadingReal] = useState(false)
-  const [loadingDots, setLoadingDots] = useState("")
 
   useEffect(() => { initializeSampleNotifications() }, [])
-
-  // Animate loading dots
-  useEffect(() => {
-    if (!loadingReal) { setLoadingDots(""); return }
-    const interval = setInterval(() => {
-      setLoadingDots(d => d.length >= 3 ? "" : d + ".")
-    }, 400)
-    return () => clearInterval(interval)
-  }, [loadingReal])
-
-  const onLoadRealDataset = useCallback(async () => {
-    setLoadingReal(true)
-    try {
-      const cases = await loadRealDataset(10)
-      setSurgeries(cases)
-      setWeeklySchedule(undefined)
-      setDelayedIds(new Set())
-      const optimized = optimizeSchedule(cases, DEFAULT_DAY, TURNOVER_MINUTES)
-      const baseline  = baselineSchedule(cases, DEFAULT_DAY, TURNOVER_MINUTES)
-      setSchedule({ optimized, baseline, kpis: computeKPIs(optimized, baseline, DEFAULT_DAY) })
-      const emergencyCount = cases.filter(c => c.priority === 1).length
-      toast({
-        title: "Dataset loaded & scheduled",
-        description: `${cases.length} random cases · ${emergencyCount} emergency · conflicts auto-detected`,
-      })
-    } catch {
-      toast({ title: "Failed to load dataset", variant: "destructive" })
-    } finally {
-      setLoadingReal(false)
-    }
-  }, [setSurgeries, setWeeklySchedule, setDelayedIds, setSchedule, toast])
 
   const onGenerate = () => {
     if (!surgeries.length) {
@@ -193,58 +263,7 @@ function AdminSidebar() {
 
   return (
     <div className="space-y-5">
-      {/* 1. Quick Actions */}
-      <div className="control-tower-card p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xl">⚡</span>
-          <div>
-            <h3 className="text-sm font-bold text-blue-800">Quick Actions</h3>
-            <p className="text-xs text-blue-600">Data management</p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {/* Load Real Dataset */}
-          <button
-            onClick={onLoadRealDataset}
-            disabled={loadingReal}
-            className="w-full rounded-lg border-2 border-blue-300 bg-white hover:bg-blue-50 active:scale-[0.98] transition-all duration-150 text-sm font-medium text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden"
-          >
-            {loadingReal ? (
-              <div className="flex items-center justify-center gap-3 px-4 py-3">
-                <span className="relative flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500" />
-                </span>
-                <span className="text-blue-700 font-medium">
-                  Fetching random cases{loadingDots}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">📂</span>
-                  <span>Load 10 Random Cases</span>
-                </div>
-                <span className="text-xs text-blue-400 bg-blue-100 px-2 py-0.5 rounded-full font-normal">650 records</span>
-              </div>
-            )}
-          </button>
-          {/* Conflict notice */}
-          <p className="text-xs text-blue-500 text-center px-1">
-            Conflicts auto-detected on every load
-          </p>
-          {/* Clear */}
-          <Button
-            onClick={() => { setSurgeries([]); setSchedule(undefined); setWeeklySchedule(undefined); setDelayedIds(new Set()) }}
-            variant="outline"
-            className="w-full text-sm text-muted-foreground"
-          >
-            🗑️ Clear All Data
-          </Button>
-        </div>
-      </div>
-
-      {/* 2. Emergency Case Insertion */}
+      {/* 1. Emergency Case Insertion */}
       <div className="control-tower-card p-5 border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50">
         <div className="flex items-center gap-2 mb-3">
           <div>
@@ -305,10 +324,7 @@ function AdminMain() {
         <ControlTowerKPIs />
       </div>
 
-      {/* 2. Utilization */}
-      <UtilizationDashboard />
-
-      {/* 3. Conflict Analysis */}
+      {/* 2. Conflict Analysis */}
       <ConflictAnalysisDashboard
         conflicts={conflictAnalysis}
         onResolveConflicts={() => {}}
@@ -435,6 +451,7 @@ function TimePredictionSection() {
   const [equipment, setEquipment] = useState("C-Arm")
   const [prediction, setPrediction] = useState<{ predMin: number; explain: string; conf: "low" | "med" | "high"; factors: Record<string, number>; deltaVsEstimate: number } | null>(null)
   const [exampleCollapsed, setExampleCollapsed] = useState(false)
+  const [sectionCollapsed, setSectionCollapsed] = useState(true)
   const { toast } = useToast()
 
   const availableDoctors = useMemo(() => filterDoctorsByProcedure(SURGEONS, surgeryType), [surgeryType])
@@ -474,14 +491,21 @@ function TimePredictionSection() {
 
   return (
     <div className="p-5">
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 rounded-xl mb-4 flex items-center gap-3">
-        <span className="text-2xl">🧠</span>
-        <div>
-          <h4 className="text-base font-bold text-white">Smart Duration Predictor</h4>
-          <p className="text-blue-100 text-xs">AI-powered surgical time estimation</p>
+      <button
+        type="button"
+        onClick={() => setSectionCollapsed(c => !c)}
+        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 rounded-xl mb-4 flex items-center justify-between gap-3 hover:brightness-110 transition-all"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🧠</span>
+          <div className="text-left">
+            <h4 className="text-base font-bold text-white">Smart Duration Predictor</h4>
+            <p className="text-blue-100 text-xs">AI-powered surgical time estimation</p>
+          </div>
         </div>
-      </div>
-      <div className="space-y-3">
+        <span className="text-white text-lg">{sectionCollapsed ? "▾" : "▴"}</span>
+      </button>
+      {!sectionCollapsed && <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">Surgery Type</label>
@@ -553,7 +577,7 @@ function TimePredictionSection() {
             )}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

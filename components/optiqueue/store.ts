@@ -42,7 +42,7 @@ export function useSchedule() {
     fetcher: async () => undefined,
     revalidateOnFocus: false,
   })
-  const delayed = useSWR<Set<string>>(DELAYED_KEY, { fetcher: async () => new Set(), revalidateOnFocus: false })
+  const delayed = useSWR<Set<string>>(DELAYED_KEY, { fetcher: async (): Promise<Set<string>> => new Set<string>(), revalidateOnFocus: false })
   return {
     schedule: sch.data,
     setSchedule: (s?: FullSchedule) => sch.mutate(s, { revalidate: false }),
@@ -56,7 +56,7 @@ export function useWeeklySchedule() {
     fetcher: async () => SAMPLE_WEEKLY_SCHEDULE,
     revalidateOnFocus: false,
   })
-  const delayed = useSWR<Set<string>>(DELAYED_KEY, { fetcher: async () => new Set(), revalidateOnFocus: false })
+  const delayed = useSWR<Set<string>>(DELAYED_KEY, { fetcher: async (): Promise<Set<string>> => new Set<string>(), revalidateOnFocus: false })
   return {
     weeklySchedule: sch.data,
     setWeeklySchedule: (s?: WeeklyFullSchedule) => sch.mutate(s, { revalidate: false }),

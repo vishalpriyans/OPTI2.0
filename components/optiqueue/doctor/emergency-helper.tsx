@@ -52,7 +52,7 @@ export function EmergencyRequestDialog({ surgeonId, date }: { surgeonId: string;
         notes: notes || undefined,
       })
       
-      logAction(user.id, 'emergency-request', { procedure, estimateMin, equipmentIds })
+      logAction(user?.id ?? 'unknown', 'emergency-request', { procedure, estimateMin, equipmentIds })
       
       toast({
         title: "Emergency slot requested",
