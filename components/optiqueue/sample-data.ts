@@ -321,33 +321,16 @@ export function convertDatasetRecord(r: RawDatasetRecord, idx: number): CaseInpu
   }
 }
 
-/** Fetch and parse the real dataset, return up to maxCases CaseInput records */
-export async function loadRealDataset(maxCases = 20): Promise<CaseInput[]> {
+/** Fetch and parse the real dataset, return maxCases truly random records each call */
+export async function loadRealDataset(maxCases = 10): Promise<CaseInput[]> {
   const res = await fetch("/optiqueue_data.json")
   if (!res.ok) throw new Error("Failed to load dataset")
   const raw: RawDatasetRecord[] = await res.json()
-  // Pick a diverse subset: spread across procedures, prioritize emergencies first
-  const sorted = [...raw].sort((a, b) => {
-    const pa = mapPriority(a.case_type, a.patient_complexity)
-    const pb = mapPriority(b.case_type, b.patient_complexity)
-    return pa - pb
-  })
-  // Deduplicate by procedure to maximise variety
-  const seen = new Set<string>()
-  const diverse: RawDatasetRecord[] = []
-  for (const r of sorted) {
-    if (!seen.has(r.procedure)) {
-      seen.add(r.procedure)
-      diverse.push(r)
-    }
-    if (diverse.length >= maxCases) break
+  // Fisher-Yates shuffle for true randomness each call
+  const shuffled = [...raw]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
-  // Fill remaining slots if fewer than maxCases unique procedures
-  if (diverse.length < maxCases) {
-    for (const r of sorted) {
-      if (diverse.length >= maxCases) break
-      if (!diverse.includes(r)) diverse.push(r)
-    }
-  }
-  return diverse.map(convertDatasetRecord)
+  return shuffled.slice(0, maxCases).map((r, idx) => convertDatasetRecord(r, idx))
 }
