@@ -41,12 +41,12 @@ export function EquipmentIcon({ className }: Icon3DProps) {
             <feDropShadow dx="2" dy="4" stdDeviation="4" floodColor="oklch(0.45 0.08 180 / 0.3)"/>
           </filter>
         </defs>
-        <rect x="8" y="16" width="32" height="24" rx="4" fill="url(#equipmentGradient)" filter="url(#equipmentShadow)" />
-        <rect x="12" y="20" width="24" height="16" rx="2" fill="white" opacity="0.9" />
-        <circle cx="20" cy="28" r="3" fill="oklch(0.45 0.08 180)" />
-        <circle cx="28" cy="28" r="3" fill="oklch(0.45 0.08 180)" />
-        <rect x="22" y="12" width="4" height="8" fill="url(#equipmentGradient)" />
-        <rect x="20" y="10" width="8" height="2" fill="url(#equipmentGradient)" />
+        <circle cx="24" cy="24" r="20" fill="url(#equipmentGradient)" filter="url(#equipmentShadow)" />
+        <rect x="12" y="18" width="24" height="18" rx="3" fill="white" opacity="0.9" />
+        <circle cx="19" cy="27" r="3" fill="oklch(0.45 0.08 180)" />
+        <circle cx="29" cy="27" r="3" fill="oklch(0.45 0.08 180)" />
+        <rect x="22" y="12" width="4" height="6" fill="white" opacity="0.9" />
+        <rect x="20" y="11" width="8" height="2" fill="white" opacity="0.9" />
       </svg>
     </div>
   )
@@ -114,13 +114,13 @@ export function SurgeryIcon({ className }: Icon3DProps) {
             <feDropShadow dx="2" dy="4" stdDeviation="4" floodColor="oklch(0.3 0.05 240 / 0.3)"/>
           </filter>
         </defs>
-        <rect x="12" y="16" width="24" height="20" rx="4" fill="url(#surgeryGradient)" filter="url(#surgeryShadow)" />
-        <rect x="16" y="20" width="16" height="12" rx="2" fill="white" opacity="0.9" />
+        <circle cx="24" cy="24" r="20" fill="url(#surgeryGradient)" filter="url(#surgeryShadow)" />
+        <rect x="14" y="18" width="20" height="16" rx="3" fill="white" opacity="0.9" />
         <circle cx="20" cy="26" r="2" fill="oklch(0.3 0.05 240)" />
         <circle cx="28" cy="26" r="2" fill="oklch(0.3 0.05 240)" />
         <path d="M20 30 L28 30" stroke="oklch(0.3 0.05 240)" strokeWidth="2" strokeLinecap="round" />
-        <rect x="22" y="8" width="4" height="12" fill="url(#surgeryGradient)" />
-        <rect x="20" y="6" width="8" height="2" fill="url(#surgeryGradient)" />
+        <rect x="22" y="11" width="4" height="7" fill="white" opacity="0.9" />
+        <rect x="20" y="10" width="8" height="2" fill="white" opacity="0.9" />
       </svg>
     </div>
   )

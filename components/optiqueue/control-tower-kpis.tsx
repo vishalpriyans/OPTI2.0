@@ -82,7 +82,7 @@ export function ControlTowerKPIs() {
                     {kpi.title}
                   </h3>
                 </div>
-                <div className="p-0.5 rounded bg-gray-100 flex-shrink-0 ml-1">
+                <div className="p-0.5 rounded bg-gray-100 flex-shrink-0 ml-1 mr-8 mt-8">
                   <IconComponent className="w-1.5 h-1.5 text-gray-600" />
                 </div>
               </div>

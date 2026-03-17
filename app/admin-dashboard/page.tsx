@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Gantt } from "@/components/optiqueue/gantt"
 import { ControlTowerKPIs } from "@/components/optiqueue/control-tower-kpis"
 import { EmergencyInserter } from "@/components/optiqueue/emergency-inserter"
-import { EmergencyIcon } from "@/components/optiqueue/3d-icons"
 import { OptiQueueLogo } from "@/components/optiqueue/optiqueue-logo"
 import { ConflictAnalysisDashboard } from "@/components/optiqueue/conflict-analysis-dashboard"
 import { UtilizationDashboard } from "@/components/optiqueue/utilization-dashboard"
@@ -224,10 +223,9 @@ function AdminSidebar() {
       {/* 2. Emergency Case Insertion */}
       <div className="control-tower-card p-5 border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50">
         <div className="flex items-center gap-2 mb-3">
-          <EmergencyIcon className="w-5 h-5 text-red-600" />
           <div>
-            <h3 className="text-sm font-bold text-red-700">Emergency Insertion</h3>
-            <p className="text-xs text-red-600">Add urgent cases with priority override</p>
+            <h3 className="text-base font-bold text-red-700">Emergency Insertion</h3>
+            <p className="text-sm text-red-600">Add urgent cases with priority override</p>
           </div>
         </div>
         <EmergencyInserter />
