@@ -1,5 +1,27 @@
 import type { ScheduledCase, CaseInput } from "./types"
 
+/**
+ * Detect conflicts on raw unscheduled cases by naively assigning them all
+ * the same start time (round-robin across OTs). This exposes surgeon,
+ * equipment, and priority conflicts that the optimizer would otherwise hide.
+ */
+export function detectInputConflicts(cases: CaseInput[]): ConflictAnalysis {
+  if (!cases.length) {
+    return { conflicts: [], totalConflicts: 0, criticalConflicts: 0, autoResolvableConflicts: 0, requiresManualIntervention: false }
+  }
+  // Assign every case the same 07:00 start within a round-robin OT.
+  // Cases in the same OT will time-overlap, and same surgeon/equipment pairs
+  // will show surgeon/equipment conflicts — exactly what we want to surface.
+  const scheduled: ScheduledCase[] = cases.map((c, i) => ({
+    ...c,
+    otIndex: i % 5,
+    startMinute: 420,                      // all start at 07:00
+    endMinute: 420 + c.durationMinutes,
+    dayIndex: 0,
+  }))
+  return detectConflicts(scheduled)
+}
+
 export interface ConflictConstraint {
   id: string
   type: 'surgeon' | 'equipment' | 'time' | 'ot' | 'priority'

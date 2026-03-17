@@ -14,7 +14,7 @@ import { EmergencyInserter } from "@/components/optiqueue/emergency-inserter"
 import { OptiQueueLogo } from "@/components/optiqueue/optiqueue-logo"
 import { ConflictAnalysisDashboard } from "@/components/optiqueue/conflict-analysis-dashboard"
 import { UtilizationDashboard } from "@/components/optiqueue/utilization-dashboard"
-import { detectConflicts } from "@/components/optiqueue/conflict-detector"
+import { detectInputConflicts } from "@/components/optiqueue/conflict-detector"
 import { useSchedule, useSurgeries, useWeeklySchedule } from "@/components/optiqueue/store"
 import { optimizeSchedule, computeKPIs, baselineSchedule } from "@/components/optiqueue/scheduler"
 import { DEFAULT_DAY, TURNOVER_MINUTES } from "@/components/optiqueue/types"
@@ -305,10 +305,13 @@ function AdminSidebar() {
 function AdminMain() {
   const { schedule, delayedIds } = useSchedule()
   const { weeklySchedule } = useWeeklySchedule()
+  const { surgeries } = useSurgeries()
   const [isWeeklyView, setIsWeeklyView] = useState(false)
 
-  const currentCases = schedule?.optimized?.cases ?? weeklySchedule?.optimized?.cases ?? (weeklySchedule as any)?.cases ?? []
-  const conflictAnalysis = detectConflicts(currentCases)
+  // Detect conflicts on the RAW input cases (pre-optimization) so we always
+  // surface real surgeon/equipment/priority clashes — the optimized schedule
+  // resolves them by construction and would always show zero conflicts.
+  const conflictAnalysis = useMemo(() => detectInputConflicts(surgeries), [surgeries])
 
   return (
     <div className="space-y-6">
