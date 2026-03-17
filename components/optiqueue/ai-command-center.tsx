@@ -79,7 +79,7 @@ export function AICommandCenter() {
   const { schedule } = useSchedule()
   const { weeklySchedule } = useWeeklySchedule()
   const { surgeries } = useSurgeries()
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState("")
   const [listening, setListening] = useState(false)
   const [serviceStatus, setServiceStatus] = useState<"active" | "error">("active")
@@ -186,41 +186,36 @@ export function AICommandCenter() {
   }
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary/10 to-primary/5 border-b cursor-pointer"
-        onClick={() => setIsOpen((o) => !o)}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Bot className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <div>
-            <span className="font-semibold text-sm">AI Command Center</span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span
-                className={cn(
-                  "w-1.5 h-1.5 rounded-full",
-                  serviceStatus === "active" ? "bg-green-500" : "bg-red-500"
-                )}
-              />
-              <span className="text-[10px] text-muted-foreground">
-                {serviceStatus === "active" ? "Groq · Llama 3.3 70B" : "Connection error"}
-              </span>
+    <div className="flex flex-col items-end gap-2">
+      {/* Expanded chat panel — shown above the trigger button */}
+      {isOpen && (
+        <div className="w-80 sm:w-96 rounded-xl border bg-card shadow-2xl overflow-hidden">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary/10 to-primary/5 border-b">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+                <Bot className="w-3.5 h-3.5 text-primary-foreground" />
+              </div>
+              <div>
+                <span className="font-semibold text-sm">AI Command Center</span>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className={cn("w-1.5 h-1.5 rounded-full", serviceStatus === "active" ? "bg-green-500" : "bg-red-500")} />
+                  <span className="text-[10px] text-muted-foreground">
+                    {serviceStatus === "active" ? "Groq · Llama 3.3 70B" : "Connection error"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px] py-0">
+                {messages.filter((m) => m.role === "assistant").length} responses
+              </Badge>
+              <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <ChevronDown className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-[10px] py-0">
-            {messages.filter((m) => m.role === "assistant").length} responses
-          </Badge>
-          {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-        </div>
-      </div>
 
-      {isOpen && (
-        <>
           {/* Messages */}
           <div className="h-72 overflow-y-auto p-3 space-y-3 bg-background/50">
             {messages.length === 0 && (
@@ -247,38 +242,27 @@ export function AICommandCenter() {
               const text = getMessageText(m)
               const toolParts = m.role === "assistant" ? getToolParts(m) : []
               return (
-                <div
-                  key={m.id}
-                  className={cn("flex gap-2", m.role === "user" ? "justify-end" : "justify-start")}
-                >
+                <div key={m.id} className={cn("flex gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
                   {m.role === "assistant" && (
                     <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
                       <Bot className="w-3 h-3 text-primary-foreground" />
                     </div>
                   )}
-                  <div className={cn("max-w-[85%] space-y-1")}>
-                    {/* Tool call badges */}
+                  <div className="max-w-[85%] space-y-1">
                     {toolParts.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {toolParts.map((part, i) => (
-                          <ToolCallBadge
-                            key={i}
-                            name={part.toolName}
-                            done={part.state === "output-available"}
-                          />
+                          <ToolCallBadge key={i} name={part.toolName} done={part.state === "output-available"} />
                         ))}
                       </div>
                     )}
-                    {/* Message bubble */}
                     {text && (
-                      <div
-                        className={cn(
-                          "px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap",
-                          m.role === "user"
-                            ? "bg-primary text-primary-foreground rounded-tr-sm"
-                            : "bg-muted text-foreground rounded-tl-sm"
-                        )}
-                      >
+                      <div className={cn(
+                        "px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap",
+                        m.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-tr-sm"
+                          : "bg-muted text-foreground rounded-tl-sm"
+                      )}>
                         {text}
                       </div>
                     )}
@@ -323,10 +307,7 @@ export function AICommandCenter() {
           )}
 
           {/* Input */}
-          <form
-            onSubmit={handleSubmit}
-            className="flex items-center gap-2 p-3 border-t bg-background"
-          >
+          <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3 border-t bg-background">
             <Button
               type="button"
               size="icon"
@@ -344,21 +325,33 @@ export function AICommandCenter() {
               className="flex-1 text-sm bg-muted/50 rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-primary border border-transparent focus:border-primary/30"
               disabled={isLoading}
             />
-            <Button
-              type="submit"
-              size="icon"
-              className="shrink-0 h-8 w-8"
-              disabled={isLoading || !input.trim()}
-            >
-              {isLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
+            <Button type="submit" size="icon" className="shrink-0 h-8 w-8" disabled={isLoading || !input.trim()}>
+              {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </Button>
           </form>
-        </>
+        </div>
       )}
+
+      {/* Floating trigger button */}
+      <button
+        onClick={() => setIsOpen((o) => !o)}
+        className={cn(
+          "relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95",
+          "bg-primary text-primary-foreground",
+          isOpen && "ring-4 ring-primary/30"
+        )}
+        title="AI Command Center"
+      >
+        {isLoading ? (
+          <Loader2 className="w-6 h-6 animate-spin" />
+        ) : (
+          <Bot className="w-6 h-6" />
+        )}
+        {/* Unread dot */}
+        {!isOpen && messages.filter((m) => m.role === "assistant").length > 0 && (
+          <span className="absolute top-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+        )}
+      </button>
     </div>
   )
 }

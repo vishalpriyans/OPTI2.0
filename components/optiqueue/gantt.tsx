@@ -9,6 +9,49 @@ import type { JSX } from "react" // Declare JSX variable
 
 const TOTAL_MINUTES = DEFAULT_DAY.endMinute - DEFAULT_DAY.startMinute
 
+/** Returns current offset in minutes from 07:00, or null if outside 07:00–17:00 */
+function getNowMinute(): number | null {
+  const now = new Date()
+  const offset = now.getHours() * 60 + now.getMinutes() - DEFAULT_DAY.startMinute
+  if (offset < 0 || offset > TOTAL_MINUTES) return null
+  return offset
+}
+
+/** Tracks current time minute, updates every 60s */
+function useLiveMinute() {
+  const [nowMinute, setNowMinute] = useState<number | null>(getNowMinute)
+  useEffect(() => {
+    const id = setInterval(() => setNowMinute(getNowMinute()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return nowMinute
+}
+
+/** Red vertical line showing current time across all OT rows */
+function LiveTimeLine({ nowMinute }: { nowMinute: number }) {
+  const pct = (nowMinute / TOTAL_MINUTES) * 100
+  return (
+    <div
+      className="absolute top-0 bottom-0 z-20 pointer-events-none"
+      style={{ left: `${pct}%` }}
+    >
+      {/* Triangle marker at top */}
+      <div
+        className="absolute -top-1.5 -translate-x-1/2"
+        style={{
+          width: 0,
+          height: 0,
+          borderLeft: "5px solid transparent",
+          borderRight: "5px solid transparent",
+          borderTop: "6px solid #EF4444",
+        }}
+      />
+      {/* Vertical line */}
+      <div className="absolute top-0 bottom-0 w-0.5 bg-red-500" style={{ left: "-1px" }} />
+    </div>
+  )
+}
+
 /** Build a delayRiskMap from scheduled cases using the TypeScript heuristic scorer */
 function buildRiskMap(cases: ScheduledCase[]): Record<string, MLDelayRisk> {
   const map: Record<string, MLDelayRisk> = {}
@@ -69,6 +112,7 @@ export function Gantt({
 }) {
   const { schedule } = useSchedule()
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set())
+  const nowMinute = useLiveMinute()
 
   // Flash AI-changed cases gold for 2s then fade
   useEffect(() => {
@@ -89,9 +133,21 @@ export function Gantt({
   perOT.forEach((row) => row.sort((a, b) => a.startMinute - b.startMinute))
 
   return (
-    <div className="space-y-3">
-      <TimeAxis />
-      <div className="space-y-3">
+    <div className="space-y-0">
+      {/* FIX 1: extra bottom padding pushes labels clear of OT 1 */}
+      <div className="pb-6">
+        <TimeAxis />
+      </div>
+
+      {/* Chart body — position:relative so live line spans all rows */}
+      <div className="relative space-y-3">
+        {/* FIX 2: live time line spanning full chart height */}
+        {nowMinute !== null && (
+          <div className="absolute inset-0 pointer-events-none z-10" style={{ left: "5.75rem" }}>
+            <LiveTimeLine nowMinute={nowMinute} />
+          </div>
+        )}
+
         {perOT.map((row, idx) => {
           const rowRender = renderRow(row, delayedIds, riskMap, flashIds)
           const laneCount = Math.max(1, rowRender.laneCount)
@@ -175,13 +231,14 @@ function WeeklyGantt({ delayedIds, aiChangedIds }: { delayedIds: Set<string>; ai
 function TimeAxis() {
   const ticks = [0, 120, 240, 360, 480, 600]
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-20" />
-      <div className="relative flex-1 h-8 gantt-timeline rounded-lg p-2">
+    <div className="flex items-start gap-3">
+      <div className="w-20 shrink-0" />
+      {/* h-10 gives tick lines room; labels sit inside via mt-1 */}
+      <div className="relative flex-1 h-10 gantt-timeline rounded-lg px-2 pt-1">
         {ticks.map((t, i) => (
-          <div key={i} className="absolute top-0" style={{ left: `${(t / TOTAL_MINUTES) * 100}%` }}>
-            <div className="w-px h-8 bg-primary/30" />
-            <div className="absolute -translate-x-1/2 top-8 text-[11px] font-medium text-foreground">
+          <div key={i} className="absolute top-0 bottom-0" style={{ left: `${(t / TOTAL_MINUTES) * 100}%` }}>
+            <div className="w-px h-full bg-primary/30" />
+            <div className="absolute -translate-x-1/2 top-1 text-[11px] font-medium text-foreground whitespace-nowrap">
               {minutesToTime(7, t)}
             </div>
           </div>

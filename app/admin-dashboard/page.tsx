@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { SessionProtection } from "@/components/auth/session-protection"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +19,7 @@ import { useSchedule, useSurgeries, useWeeklySchedule } from "@/components/optiq
 import { optimizeSchedule, computeKPIs, baselineSchedule } from "@/components/optiqueue/scheduler"
 import { DEFAULT_DAY, TURNOVER_MINUTES } from "@/components/optiqueue/types"
 import {
-  SAMPLE_SURGERIES, SAMPLE_WEEKLY_SCHEDULE, SAMPLE_DAILY_CASES_WITH_CONFLICTS,
+  SAMPLE_WEEKLY_SCHEDULE,
   PROCEDURE_NAMES, SURGEONS, EQUIPMENT, PRIORITY_LABELS, SAMPLE_AGGREGATES, loadRealDataset
 } from "@/components/optiqueue/sample-data"
 import { predictDuration, slotOfDayFrom } from "@/components/optiqueue/predictor"
@@ -127,6 +127,11 @@ function AdminDashboardContent() {
           </Suspense>
         </div>
       </div>
+
+      {/* ── Floating AI Command Center ── */}
+      <div className="fixed bottom-5 right-5 z-50">
+        <AICommandCenter />
+      </div>
     </main>
   )
 }
@@ -139,45 +144,40 @@ function AdminSidebar() {
   const { weeklySchedule, setWeeklySchedule } = useWeeklySchedule()
   const { toast } = useToast()
   const [loadingReal, setLoadingReal] = useState(false)
+  const [loadingDots, setLoadingDots] = useState("")
 
   useEffect(() => { initializeSampleNotifications() }, [])
 
-  const onLoadSample = () => {
-    setSurgeries(SAMPLE_SURGERIES)
-    setSchedule(undefined)
-    setWeeklySchedule(SAMPLE_WEEKLY_SCHEDULE)
-    setDelayedIds(new Set())
-    toast({ title: "Sample data loaded" })
-  }
+  // Animate loading dots
+  useEffect(() => {
+    if (!loadingReal) { setLoadingDots(""); return }
+    const interval = setInterval(() => {
+      setLoadingDots(d => d.length >= 3 ? "" : d + ".")
+    }, 400)
+    return () => clearInterval(interval)
+  }, [loadingReal])
 
-  const onLoadSampleConflicts = () => {
-    setSchedule({
-      optimized: { cases: SAMPLE_DAILY_CASES_WITH_CONFLICTS, idleMinutes: 200, overtimeMinutes: 30, waitCost: 2000 },
-      baseline:  { cases: SAMPLE_DAILY_CASES_WITH_CONFLICTS, idleMinutes: 300, overtimeMinutes: 60, waitCost: 3000 },
-      kpis: { utilizationRate: 0.75, totalProjectedOvertime: 30, baselineUtilizationRate: 0.65, baselineOvertime: 60 },
-    })
-    setWeeklySchedule(undefined)
-    setDelayedIds(new Set())
-    toast({ title: "Sample conflicts loaded" })
-  }
-
-  const onLoadRealDataset = async () => {
+  const onLoadRealDataset = useCallback(async () => {
     setLoadingReal(true)
     try {
-      const cases = await loadRealDataset(20)
+      const cases = await loadRealDataset(10)
       setSurgeries(cases)
       setWeeklySchedule(undefined)
       setDelayedIds(new Set())
       const optimized = optimizeSchedule(cases, DEFAULT_DAY, TURNOVER_MINUTES)
       const baseline  = baselineSchedule(cases, DEFAULT_DAY, TURNOVER_MINUTES)
       setSchedule({ optimized, baseline, kpis: computeKPIs(optimized, baseline, DEFAULT_DAY) })
-      toast({ title: "Real dataset loaded & scheduled", description: `${cases.length} cases from 650-record dataset` })
+      const emergencyCount = cases.filter(c => c.priority === 1).length
+      toast({
+        title: "Dataset loaded & scheduled",
+        description: `${cases.length} random cases · ${emergencyCount} emergency · conflicts auto-detected`,
+      })
     } catch {
       toast({ title: "Failed to load dataset", variant: "destructive" })
     } finally {
       setLoadingReal(false)
     }
-  }
+  }, [setSurgeries, setWeeklySchedule, setDelayedIds, setSchedule, toast])
 
   const onGenerate = () => {
     if (!surgeries.length) {
@@ -203,19 +203,43 @@ function AdminSidebar() {
           </div>
         </div>
         <div className="space-y-2">
-          <div className="flex gap-2">
-            <Button onClick={onLoadSample} variant="secondary" className="flex-1 text-sm">
-              📊 Load Sample
-            </Button>
-            <Button onClick={() => { setSurgeries([]); setSchedule(undefined); setWeeklySchedule(undefined); setDelayedIds(new Set()) }} variant="outline" className="flex-1 text-sm">
-              🗑️ Clear
-            </Button>
-          </div>
-          <Button onClick={onLoadRealDataset} disabled={loadingReal} variant="outline" className="w-full border-blue-200 text-blue-700 hover:bg-blue-50 text-sm">
-            {loadingReal ? "Loading…" : "📂 Load Real Dataset (650 cases)"}
-          </Button>
-          <Button onClick={onLoadSampleConflicts} variant="outline" className="w-full border-orange-200 text-orange-700 hover:bg-orange-50 text-sm">
-            🚨 Load Sample Conflicts
+          {/* Load Real Dataset */}
+          <button
+            onClick={onLoadRealDataset}
+            disabled={loadingReal}
+            className="w-full rounded-lg border-2 border-blue-300 bg-white hover:bg-blue-50 active:scale-[0.98] transition-all duration-150 text-sm font-medium text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden"
+          >
+            {loadingReal ? (
+              <div className="flex items-center justify-center gap-3 px-4 py-3">
+                <span className="relative flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500" />
+                </span>
+                <span className="text-blue-700 font-medium">
+                  Fetching random cases{loadingDots}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📂</span>
+                  <span>Load 10 Random Cases</span>
+                </div>
+                <span className="text-xs text-blue-400 bg-blue-100 px-2 py-0.5 rounded-full font-normal">650 records</span>
+              </div>
+            )}
+          </button>
+          {/* Conflict notice */}
+          <p className="text-xs text-blue-500 text-center px-1">
+            Conflicts auto-detected on every load
+          </p>
+          {/* Clear */}
+          <Button
+            onClick={() => { setSurgeries([]); setSchedule(undefined); setWeeklySchedule(undefined); setDelayedIds(new Set()) }}
+            variant="outline"
+            className="w-full text-sm text-muted-foreground"
+          >
+            🗑️ Clear All Data
           </Button>
         </div>
       </div>
@@ -333,8 +357,6 @@ function AdminMain() {
       {/* 6. Cases Table */}
       <CasesTable />
 
-      {/* 7. AI Command Center */}
-      <AICommandCenter />
     </div>
   )
 }
