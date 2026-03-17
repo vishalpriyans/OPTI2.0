@@ -127,6 +127,11 @@ function AdminDashboardContent() {
           </Suspense>
         </div>
       </div>
+
+      {/* ── Floating AI Command Center ── */}
+      <div className="fixed bottom-5 right-5 z-50">
+        <AICommandCenter />
+      </div>
     </main>
   )
 }
@@ -352,8 +357,6 @@ function AdminMain() {
       {/* 6. Cases Table */}
       <CasesTable />
 
-      {/* 7. AI Command Center */}
-      <AICommandCenter />
     </div>
   )
 }
