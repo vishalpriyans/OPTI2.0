@@ -1,0 +1,21 @@
+{
+  "name": "OptiQueue",
+  "short_name": "OptiQueue",
+  "description": "Advanced Operating Theater scheduling optimization system",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#20B2AA",
+  "background_color": "#F8FAFC",
+  "display": "standalone",
+  "start_url": "/"
+}
