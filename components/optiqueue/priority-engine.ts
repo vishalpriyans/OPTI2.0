@@ -224,19 +224,14 @@ export function getPriorityColor(priority: PriorityLevel): string {
   return colors[priority]
 }
 
-/**
- * Get all available procedures with their priorities
- */
-export function getAllProcedurePriorities(): Array<{
-  procedure: string
-  priority: PriorityLevel
-  label: string
-  reason: string
-}> {
-  return Object.entries(PROCEDURE_PRIORITY_MAP).map(([procedure, data]) => ({
-    procedure,
-    priority: data.priority,
-    label: getPriorityLabel(data.priority),
-    reason: data.reason
-  }))
+/** Map priority number to CSS class used by Gantt and case tables */
+export function getPriorityClass(priority: number): string {
+  switch (priority) {
+    case 1: return "priority-emergency"
+    case 2: return "priority-high"
+    case 3: return "priority-medium"
+    case 4: return "priority-low"
+    case 5:
+    default: return "priority-elective"
+  }
 }

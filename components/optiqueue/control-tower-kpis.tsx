@@ -15,18 +15,21 @@ export function ControlTowerKPIs() {
   const cases = currentSchedule?.optimized.cases || []
   const kpis = currentSchedule?.kpis
   
-  // Calculate today's overtime
-  const today = new Date().getDay() - 1 // Convert to 0-6 (Monday-Sunday)
-  const todayCases = cases.filter(c => c.dayIndex === today || c.dayIndex === undefined)
-  const totalDuration = todayCases.reduce((sum, c) => sum + c.durationMinutes, 0)
-  const totalTurnover = todayCases.length * 30 // 30 min turnover per case
-  const totalTime = totalDuration + totalTurnover
-  const workingHours = 10 * 60 // 10 hours in minutes
-  const overtime = Math.max(0, totalTime - workingHours)
+  // Daily schedule sets every case to dayIndex:0 — day-of-week filtering is only
+  // meaningful for the weekly schedule. Use all cases when in daily mode.
+  const isWeeklyMode = !schedule && !!weeklySchedule
+  const today = (new Date().getDay() + 6) % 7 // 0=Mon … 6=Sun, safe for Sunday
+  const todayCases = isWeeklyMode
+    ? cases.filter(c => c.dayIndex === today || c.dayIndex === undefined)
+    : cases
+  // Use the scheduler's per-OT overtime (already computed correctly in withMetrics).
+  // The naive sum-of-all-durations approach was wrong because it ignored parallelism
+  // across 5 OTs — it treated every case as if it ran in a single serial queue.
+  const overtime = kpis?.totalProjectedOvertime ?? 0
   
   // Calculate utilization rate
   const utilizationRate = kpis?.utilizationRate || 0
-  const utilizationPercentage = Math.round(utilizationRate * 100)
+  const utilizationPercentage = Math.round(utilizationRate) // already a percentage (0-100)
   
   // Calculate active OTs
   const activeOTs = new Set(todayCases.map(c => c.otIndex)).size

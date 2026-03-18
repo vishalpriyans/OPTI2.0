@@ -1,4 +1,4 @@
-import type { CaseInput, ScheduledCase, WeeklyFullSchedule } from "./types"
+import type { CaseInput, ScheduledCase, WeeklyFullSchedule, FullSchedule } from "./types"
 import type { CompletedCase, Aggregates } from "./predictor"
 import { buildAggregates } from "./predictor"
 import { DEFAULT_WEEK } from "./types"
@@ -333,4 +333,55 @@ export async function loadRealDataset(maxCases = 10): Promise<CaseInput[]> {
     ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   return shuffled.slice(0, maxCases).map((r, idx) => convertDatasetRecord(r, idx))
+}
+
+// ── Demo Conflict Dataset ─────────────────────────────────────────────────────
+// A hand-crafted schedule with 5 deliberate conflicts across all 4 types.
+// Used by the "Demo Conflicts" button so reviewers can see the conflict panel
+// without needing to manufacture overlaps manually.
+//
+// All times are minutes from 07:00 (DAY_START=0, DAY_END=600).
+//
+// Conflicts baked in:
+//   1. SURGEON HIGH     – Dr. Rajesh Kumar in OT-0 (0→120) AND OT-1 (60→150)  → overlap 60–120
+//   2. EQUIPMENT MEDIUM – C-Arm needed by OT-0 DC-001 (0→120) AND OT-2 DC-003 (80→200) → overlap 80–120
+//   3. TIME HIGH        – OT-3: DC-004 (120→240) and DC-005 (180→300) overlap 180–240
+//   4. OT HIGH          – same OT-3 pair, also caught by the OT detector
+//   5. PRIORITY CRITICAL– Emergency DC-007 (start=150) delayed behind elective DC-006 (start=0) in OT-4
+
+export const DEMO_CONFLICT_CASES: CaseInput[] = [
+  { id: "DC-001", name: "Hip Replacement",    durationMinutes: 120, surgeon: "Dr. Rajesh Kumar", equipment: "C-Arm",         priority: 3 },
+  { id: "DC-002", name: "Knee Replacement",   durationMinutes: 90,  surgeon: "Dr. Rajesh Kumar", equipment: "Scope",          priority: 3 },
+  { id: "DC-003", name: "Spine Fusion",       durationMinutes: 120, surgeon: "Dr. Priya Sharma",  equipment: "C-Arm",         priority: 2 },
+  { id: "DC-004", name: "Appendectomy",       durationMinutes: 120, surgeon: "Dr. Anil Mehta",    equipment: "Lap Tower",     priority: 4 },
+  { id: "DC-005", name: "Hernia Repair",      durationMinutes: 120, surgeon: "Dr. Vikram Singh",  equipment: "Basic Set",     priority: 3 },
+  { id: "DC-006", name: "Cholecystectomy",    durationMinutes: 90,  surgeon: "Dr. Meera Desai",   equipment: "Basic Set",     priority: 5 },
+  { id: "DC-007", name: "Emergency Trauma",   durationMinutes: 90,  surgeon: "Dr. Emergency",     equipment: "Emergency Kit", priority: 1 },
+  { id: "DC-008", name: "CABG",               durationMinutes: 180, surgeon: "Dr. Sunita Reddy",  equipment: "Heart-Lung",    priority: 2 },
+  { id: "DC-009", name: "Knee Arthroscopy",   durationMinutes: 75,  surgeon: "Dr. Arjun Patel",   equipment: "Scope",         priority: 4 },
+  { id: "DC-010", name: "Gallbladder Surgery",durationMinutes: 90,  surgeon: "Dr. Kavita Nair",   equipment: "Lap Tower",     priority: 3 },
+]
+
+const _DEMO_SCHEDULED: ScheduledCase[] = [
+  // OT-0 ── DC-001 (anchor for surgeon + equipment conflicts) + DC-009
+  { id: "DC-001", name: "Hip Replacement",    durationMinutes: 120, surgeon: "Dr. Rajesh Kumar", equipment: "C-Arm",         priority: 3, otIndex: 0, startMinute: 0,   endMinute: 120, dayIndex: 0 },
+  { id: "DC-009", name: "Knee Arthroscopy",   durationMinutes: 75,  surgeon: "Dr. Arjun Patel",  equipment: "Scope",         priority: 4, otIndex: 0, startMinute: 150, endMinute: 225, dayIndex: 0 },
+  // OT-1 ── DC-002 starts at 60 → overlaps DC-001's surgeon window 60–120 (SURGEON CONFLICT)
+  { id: "DC-002", name: "Knee Replacement",   durationMinutes: 90,  surgeon: "Dr. Rajesh Kumar", equipment: "Scope",         priority: 3, otIndex: 1, startMinute: 60,  endMinute: 150, dayIndex: 0 },
+  { id: "DC-008", name: "CABG",               durationMinutes: 180, surgeon: "Dr. Sunita Reddy", equipment: "Heart-Lung",    priority: 2, otIndex: 1, startMinute: 200, endMinute: 380, dayIndex: 0 },
+  // OT-2 ── DC-003 needs C-Arm starting at 80 → overlaps DC-001 (C-Arm 0→120) (EQUIPMENT CONFLICT)
+  { id: "DC-003", name: "Spine Fusion",       durationMinutes: 120, surgeon: "Dr. Priya Sharma", equipment: "C-Arm",         priority: 2, otIndex: 2, startMinute: 80,  endMinute: 200, dayIndex: 0 },
+  { id: "DC-010", name: "Gallbladder Surgery",durationMinutes: 90,  surgeon: "Dr. Kavita Nair",  equipment: "Lap Tower",     priority: 3, otIndex: 2, startMinute: 240, endMinute: 330, dayIndex: 0 },
+  // OT-3 ── DC-004 and DC-005 overlap 180–240 (TIME + OT CONFLICT)
+  { id: "DC-004", name: "Appendectomy",       durationMinutes: 120, surgeon: "Dr. Anil Mehta",   equipment: "Lap Tower",     priority: 4, otIndex: 3, startMinute: 120, endMinute: 240, dayIndex: 0 },
+  { id: "DC-005", name: "Hernia Repair",      durationMinutes: 120, surgeon: "Dr. Vikram Singh", equipment: "Basic Set",     priority: 3, otIndex: 3, startMinute: 180, endMinute: 300, dayIndex: 0 },
+  // OT-4 ── DC-006 elective at start; DC-007 emergency arrives late (PRIORITY CONFLICT)
+  { id: "DC-006", name: "Cholecystectomy",    durationMinutes: 90,  surgeon: "Dr. Meera Desai",  equipment: "Basic Set",     priority: 5, otIndex: 4, startMinute: 0,   endMinute: 90,  dayIndex: 0 },
+  { id: "DC-007", name: "Emergency Trauma",   durationMinutes: 90,  surgeon: "Dr. Emergency",    equipment: "Emergency Kit", priority: 1, otIndex: 4, startMinute: 150, endMinute: 240, dayIndex: 0 },
+]
+
+export const DEMO_CONFLICT_SCHEDULE: FullSchedule = {
+  optimized: { cases: _DEMO_SCHEDULED, idleMinutes: 1560, overtimeMinutes: 0, waitCost: 480 },
+  baseline:  { cases: _DEMO_SCHEDULED, idleMinutes: 1980, overtimeMinutes: 0, waitCost: 720 },
+  kpis: { utilizationRate: 48, totalProjectedOvertime: 0, baselineUtilizationRate: 34, baselineOvertime: 0 },
 }

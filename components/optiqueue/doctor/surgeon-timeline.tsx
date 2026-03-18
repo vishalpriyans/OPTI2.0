@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import type { DoctorDashboardCase } from "./types"
+import { getPriorityClass } from "../priority-engine"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -9,22 +10,6 @@ const DAY_START_HOUR = 7
 const DAY_END_HOUR = 17
 const TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60
 const TURNOVER_MINUTES = 30
-
-function getPriorityClass(priority: number): string {
-  switch (priority) {
-    case 1:
-      return "priority-emergency"
-    case 2:
-      return "priority-high"
-    case 3:
-      return "priority-medium"
-    case 4:
-      return "priority-low"
-    case 5:
-    default:
-      return "priority-elective"
-  }
-}
 
 function minutesToPosition(minutes: number): number {
   // Convert time (e.g., 8:30 = 90 minutes after 7:00) to percentage

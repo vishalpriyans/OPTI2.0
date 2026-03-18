@@ -121,41 +121,14 @@ export function filterDoctorsByProcedure(
 }
 
 /**
- * Get all available specializations
+ * Format doctor name with short specialization labels
+ * Example: "Dr. Rajesh Kumar (Orthopedic)" or "Dr. Anil Mehta (Orthopedic, General Surgeon)"
  */
-export function getAllSpecializations(): Specialization[] {
-  return [
-    "Orthopedics",
-    "General Surgery",
-    "Cardiac Surgery",
-    "Neurosurgery",
-    "Ophthalmology",
-    "Emergency/Trauma",
-    "Gynecology",
-    "Urology",
-    "ENT",
-    "Plastic Surgery",
-  ]
-}
-
-/**
- * Format doctor name with specializations
- * Example: "Dr. Rajesh Kumar (Orthopedics)" or "Dr. Anil Mehta (Orthopedics, General Surgery)"
- */
-export function formatDoctorWithSpecializations(doctor: string): string {
+export function formatDoctorWithSpecializationLabels(doctor: string): string {
   const specializations = getSpecializationsForDoctor(doctor)
   if (specializations.length === 0) {
     return doctor
   }
-  const specsText = specializations.join(", ")
-  return `${doctor} (${specsText})`
-}
-
-/**
- * Get short specialization label for display
- * Maps full names to shorter labels
- */
-export function getSpecializationLabel(spec: Specialization): string {
   const labels: Record<Specialization, string> = {
     "Orthopedics": "Orthopedic",
     "General Surgery": "General Surgeon",
@@ -168,19 +141,7 @@ export function getSpecializationLabel(spec: Specialization): string {
     "ENT": "ENT Specialist",
     "Plastic Surgery": "Plastic Surgeon",
   }
-  return labels[spec] || spec
-}
-
-/**
- * Format doctor name with short specialization labels
- * Example: "Dr. Rajesh Kumar (Orthopedic)" or "Dr. Anil Mehta (Orthopedic, General Surgeon)"
- */
-export function formatDoctorWithSpecializationLabels(doctor: string): string {
-  const specializations = getSpecializationsForDoctor(doctor)
-  if (specializations.length === 0) {
-    return doctor
-  }
-  const specsText = specializations.map(getSpecializationLabel).join(", ")
+  const specsText = specializations.map(s => labels[s] || s).join(", ")
   return `${doctor} (${specsText})`
 }
 

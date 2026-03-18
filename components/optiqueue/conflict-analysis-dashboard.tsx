@@ -7,13 +7,17 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ConflictDisplay } from "./conflict-display"
 import { ConflictAnalysis } from "./conflict-detector"
+import type { ScheduledCase, FullSchedule } from "./types"
 
 interface ConflictAnalysisDashboardProps {
   conflicts: ConflictAnalysis
   onResolveConflicts: () => void
+  scheduledCases?: ScheduledCase[]
+  schedule?: FullSchedule
+  setSchedule?: (s: FullSchedule) => void
 }
 
-export function ConflictAnalysisDashboard({ conflicts, onResolveConflicts }: ConflictAnalysisDashboardProps) {
+export function ConflictAnalysisDashboard({ conflicts, onResolveConflicts, scheduledCases, schedule, setSchedule }: ConflictAnalysisDashboardProps) {
   const [isMinimized, setIsMinimized] = useState(true)
 
   const totalConflicts = conflicts.totalConflicts
@@ -164,9 +168,12 @@ export function ConflictAnalysisDashboard({ conflicts, onResolveConflicts }: Con
           </div>
 
           {/* Detailed Conflict Analysis */}
-          <ConflictDisplay 
+          <ConflictDisplay
             conflicts={conflicts}
             onResolveConflicts={onResolveConflicts}
+            scheduledCases={scheduledCases}
+            schedule={schedule}
+            setSchedule={setSchedule}
           />
         </div>
       )}

@@ -1,26 +1,4 @@
-import type { ScheduledCase, CaseInput } from "./types"
-
-/**
- * Detect conflicts on raw unscheduled cases by naively assigning them all
- * the same start time (round-robin across OTs). This exposes surgeon,
- * equipment, and priority conflicts that the optimizer would otherwise hide.
- */
-export function detectInputConflicts(cases: CaseInput[]): ConflictAnalysis {
-  if (!cases.length) {
-    return { conflicts: [], totalConflicts: 0, criticalConflicts: 0, autoResolvableConflicts: 0, requiresManualIntervention: false }
-  }
-  // Assign every case the same 07:00 start within a round-robin OT.
-  // Cases in the same OT will time-overlap, and same surgeon/equipment pairs
-  // will show surgeon/equipment conflicts — exactly what we want to surface.
-  const scheduled: ScheduledCase[] = cases.map((c, i) => ({
-    ...c,
-    otIndex: i % 5,
-    startMinute: 420,                      // all start at 07:00
-    endMinute: 420 + c.durationMinutes,
-    dayIndex: 0,
-  }))
-  return detectConflicts(scheduled)
-}
+import type { ScheduledCase } from "./types"
 
 export interface ConflictConstraint {
   id: string
@@ -260,43 +238,3 @@ function isTimeOverlap(case1: ScheduledCase, case2: ScheduledCase): boolean {
   return case1.startMinute < case2.endMinute && case2.startMinute < case1.endMinute
 }
 
-export function generateSampleConflicts(): ConflictConstraint[] {
-  return [
-    {
-      id: 'sample-surgeon-1',
-      type: 'surgeon',
-      severity: 'high',
-      description: 'Dr. Rajesh Kumar has overlapping surgeries: S-101 and S-105',
-      affectedCases: ['S-101', 'S-105'],
-      resolution: 'S-105 will be moved to next available slot',
-      autoResolvable: true
-    },
-    {
-      id: 'sample-equipment-1',
-      type: 'equipment',
-      severity: 'medium',
-      description: 'C-Arm is needed by both S-101 and S-104 simultaneously',
-      affectedCases: ['S-101', 'S-104'],
-      resolution: 'S-104 will be rescheduled to use C-Arm after S-101',
-      autoResolvable: true
-    },
-    {
-      id: 'sample-time-1',
-      type: 'time',
-      severity: 'critical',
-      description: 'Time conflict in OT 1: EM-001 and S-102 overlap',
-      affectedCases: ['EM-001', 'S-102'],
-      resolution: 'Emergency case takes priority, S-102 moved to OT 2',
-      autoResolvable: true
-    },
-    {
-      id: 'sample-priority-1',
-      type: 'priority',
-      severity: 'critical',
-      description: 'Emergency case EM-002 is scheduled after elective case S-103',
-      affectedCases: ['EM-002', 'S-103'],
-      resolution: 'Emergency case moved to earliest available slot',
-      autoResolvable: true
-    }
-  ]
-}

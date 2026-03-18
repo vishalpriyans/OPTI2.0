@@ -4,6 +4,7 @@ import { useSchedule, useWeeklySchedule } from "./store"
 import { DEFAULT_DAY, DEFAULT_WEEK, minutesToTime, OTS, type ScheduledCase, TURNOVER_MINUTES, DAYS_OF_WEEK, type WeeklyFullSchedule } from "./types"
 import { scoreDelayRisk } from "./delay-risk-scorer"
 import type { MLDelayRisk } from "./ml-types"
+import { getPriorityClass } from "./priority-engine"
 import { cn } from "@/lib/utils"
 import type { JSX } from "react" // Declare JSX variable
 
@@ -82,23 +83,6 @@ function RiskDot({ riskLevel }: { riskLevel: "low" | "medium" | "high" }) {
       title={`${riskLevel === "high" ? "High" : "Medium"} delay risk`}
     />
   )
-}
-
-function getPriorityClass(priority: number): string {
-  switch (priority) {
-    case 1:
-      return "priority-emergency"
-    case 2:
-      return "priority-high"
-    case 3:
-      return "priority-medium"
-    case 4:
-      return "priority-low"
-    case 5:
-      return "priority-elective"
-    default:
-      return "priority-elective"
-  }
 }
 
 export function Gantt({

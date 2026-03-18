@@ -8,20 +8,51 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown, ChevronRight, AlertTriangle, Clock, User, Wrench, Building, Zap } from "lucide-react"
 import { ConflictConstraint, ConflictAnalysis } from "./conflict-detector"
+import { resolveConflict } from "./conflict-resolver"
+import type { ScheduledCase, FullSchedule } from "./types"
+import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
 interface ConflictDisplayProps {
   conflicts: ConflictAnalysis
   onResolveConflicts?: () => void
   showSampleConflicts?: boolean
+  scheduledCases?: ScheduledCase[]
+  schedule?: FullSchedule
+  setSchedule?: (s: FullSchedule) => void
 }
 
-export function ConflictDisplay({ conflicts, onResolveConflicts, showSampleConflicts = false }: ConflictDisplayProps) {
+export function ConflictDisplay({ conflicts, onResolveConflicts, showSampleConflicts = false, scheduledCases = [], schedule, setSchedule }: ConflictDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [resolvedConflicts, setResolvedConflicts] = useState<Set<string>>(new Set())
+  const [manualConflicts, setManualConflicts] = useState<Set<string>>(new Set())
+  const { toast } = useToast()
 
-  const handleResolveConflict = (conflictId: string) => {
-    setResolvedConflicts(prev => new Set([...prev, conflictId]))
+  const handleResolveConflict = (conflict: ConflictConstraint) => {
+    // Guard: need schedule + setSchedule to patch directly
+    if (!schedule || !setSchedule) {
+      onResolveConflicts?.()
+      setResolvedConflicts(prev => new Set([...prev, conflict.id]))
+      return
+    }
+
+    const { cases: fixedCases, fixed } = resolveConflict(conflict, scheduledCases)
+
+    if (!fixed) {
+      setManualConflicts(prev => new Set([...prev, conflict.id]))
+      toast({
+        title: "Cannot auto-resolve",
+        description: "This conflict needs manual intervention.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSchedule({
+      ...schedule,
+      optimized: { ...schedule.optimized, cases: fixedCases },
+    })
+    setResolvedConflicts(prev => new Set([...prev, conflict.id]))
   }
 
   const handleResolveAll = () => {
@@ -161,16 +192,21 @@ export function ConflictDisplay({ conflicts, onResolveConflicts, showSampleConfl
                       {getConflictIcon(conflict.type)}
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <Badge className={getSeverityColor(conflict.severity)}>
                           {conflict.severity.toUpperCase()}
                         </Badge>
                         <Badge variant="outline">
                           {conflict.type.toUpperCase()}
                         </Badge>
-                        {conflict.autoResolvable && (
+                        {conflict.autoResolvable && !manualConflicts.has(conflict.id) && (
                           <Badge variant="secondary" className="bg-green-100 text-green-800">
                             AUTO-RESOLVABLE
+                          </Badge>
+                        )}
+                        {manualConflicts.has(conflict.id) && (
+                          <Badge variant="secondary" className="bg-red-100 text-red-800">
+                            MANUAL INTERVENTION NEEDED
                           </Badge>
                         )}
                       </div>
@@ -184,14 +220,16 @@ export function ConflictDisplay({ conflicts, onResolveConflicts, showSampleConfl
                         <strong>Affected Cases:</strong> {conflict.affectedCases.join(', ')}
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleResolveConflict(conflict.id)}
-                      className="ml-auto"
-                    >
-                      Resolve
-                    </Button>
+                    {!manualConflicts.has(conflict.id) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleResolveConflict(conflict)}
+                        className="ml-auto"
+                      >
+                        Resolve
+                      </Button>
+                    )}
                   </div>
                 </Alert>
               ))}

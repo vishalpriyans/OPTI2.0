@@ -139,7 +139,7 @@ export default function LoginPage() {
                 <span>System Online</span>
               </div>
               <span className="w-px h-3 bg-white/15 block" />
-              <span>© 2026 OptiQueue</span>
+              <span>© {new Date().getFullYear()} OptiQueue</span>
             </div>
           </div>
 

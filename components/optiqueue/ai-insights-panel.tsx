@@ -131,7 +131,6 @@ export function AIInsightsPanel() {
   const cases =
     schedule?.optimized?.cases ??
     weeklySchedule?.optimized?.cases ??
-    (weeklySchedule as any)?.cases ??
     []
 
   useEffect(() => {

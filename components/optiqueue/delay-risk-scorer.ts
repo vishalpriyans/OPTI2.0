@@ -95,17 +95,3 @@ export function scoreDelayRisk(
   }
 }
 
-/** Score all cases in a schedule, returning a map from caseId → MLDelayRisk */
-export function scoreAllCases(
-  cases: Array<{ id: string } & RiskInput>
-): Record<string, MLDelayRisk> {
-  const result: Record<string, MLDelayRisk> = {}
-  // Group by OT (using a simple sequential position per unique otId)
-  const otPositions: Record<string, number> = {}
-  cases.forEach((c, _i) => {
-    const otKey = (c as any).otId ?? "OT-1"
-    otPositions[otKey] = (otPositions[otKey] ?? 0) + 1
-    result[c.id] = scoreDelayRisk(c, otPositions[otKey], 0)
-  })
-  return result
-}

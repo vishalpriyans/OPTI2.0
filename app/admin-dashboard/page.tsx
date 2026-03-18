@@ -14,40 +14,30 @@ import { EmergencyInserter } from "@/components/optiqueue/emergency-inserter"
 import { OptiQueueLogo } from "@/components/optiqueue/optiqueue-logo"
 import { ConflictAnalysisDashboard } from "@/components/optiqueue/conflict-analysis-dashboard"
 import { UtilizationDashboard } from "@/components/optiqueue/utilization-dashboard"
-import { detectInputConflicts } from "@/components/optiqueue/conflict-detector"
+import { detectConflicts } from "@/components/optiqueue/conflict-detector"
 import { useSchedule, useSurgeries, useWeeklySchedule } from "@/components/optiqueue/store"
 import { optimizeSchedule, computeKPIs, baselineSchedule } from "@/components/optiqueue/scheduler"
 import { DEFAULT_DAY, TURNOVER_MINUTES } from "@/components/optiqueue/types"
 import {
   SAMPLE_WEEKLY_SCHEDULE,
-  PROCEDURE_NAMES, SURGEONS, EQUIPMENT, PRIORITY_LABELS, SAMPLE_AGGREGATES, loadRealDataset
+  PROCEDURE_NAMES, SURGEONS, EQUIPMENT, PRIORITY_LABELS, SAMPLE_AGGREGATES, loadRealDataset,
+  DEMO_CONFLICT_CASES, DEMO_CONFLICT_SCHEDULE,
 } from "@/components/optiqueue/sample-data"
 import { predictDuration, slotOfDayFrom } from "@/components/optiqueue/predictor"
 import { DropdownInput } from "@/components/optiqueue/dropdown-input"
 import { filterDoctorsByProcedure, formatDoctorWithSpecializationLabels } from "@/components/optiqueue/specializations"
-import { determineProcedurePriority, getPriorityLabel, getPriorityColor } from "@/components/optiqueue/priority-engine"
+import { determineProcedurePriority, getPriorityLabel, getPriorityColor, getPriorityClass } from "@/components/optiqueue/priority-engine"
 import { NotificationPanel } from "@/components/optiqueue/notifications/notification-panel"
 import { SharePatientUpdates } from "@/components/optiqueue/notifications/share-patient-updates"
 import { initializeSampleNotifications } from "@/components/optiqueue/notifications/sample-notifications"
 import { AICommandCenter } from "@/components/optiqueue/ai-command-center"
 import { AIInsightsPanel } from "@/components/optiqueue/ai-insights-panel"
 import { useToast } from "@/components/ui/use-toast"
-import { LogOut, User, Stethoscope, Zap, BarChart2, Trash2 } from "lucide-react"
+import { LogOut, User, Stethoscope, Zap, BarChart2, Trash2, FlaskConical } from "lucide-react"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-function getPriorityClass(priority: number): string {
-  switch (priority) {
-    case 1: return "priority-emergency"
-    case 2: return "priority-high"
-    case 3: return "priority-medium"
-    case 4: return "priority-low"
-    case 5: return "priority-elective"
-    default: return "priority-elective"
-  }
-}
 
 function getPriorityDot(priority: number): string {
   switch (priority) {
@@ -90,6 +80,17 @@ function QuickActionsMenu() {
     }
   }, [setSurgeries, setWeeklySchedule, setDelayedIds, setSchedule, toast])
 
+  const onLoadDemoConflicts = useCallback(() => {
+    setSurgeries(DEMO_CONFLICT_CASES)
+    setWeeklySchedule(undefined)
+    setDelayedIds(new Set())
+    setSchedule(DEMO_CONFLICT_SCHEDULE)
+    toast({
+      title: "Demo conflict schedule loaded",
+      description: "5 intentional conflicts injected — surgeon, equipment, OT overlap, and priority.",
+    })
+  }, [setSurgeries, setWeeklySchedule, setDelayedIds, setSchedule, toast])
+
   const onClear = useCallback(() => {
     setSurgeries([])
     setSchedule(undefined)
@@ -116,6 +117,15 @@ function QuickActionsMenu() {
         ) : (
           <Zap className="h-4 w-4" />
         )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 rounded-full text-orange-500 hover:text-orange-600"
+        title="Load Demo Conflicts (5 intentional conflicts)"
+        onClick={onLoadDemoConflicts}
+      >
+        <FlaskConical className="h-4 w-4" />
       </Button>
       <Button
         variant="ghost"
@@ -243,23 +253,7 @@ function AdminDashboardContent() {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 function AdminSidebar() {
-  const { surgeries } = useSurgeries()
-  const { setSchedule, delayedIds, setDelayedIds } = useSchedule()
-  const { toast } = useToast()
-
   useEffect(() => { initializeSampleNotifications() }, [])
-
-  const onGenerate = () => {
-    if (!surgeries.length) {
-      toast({ title: "No surgeries", description: "Please add cases first", variant: "destructive" })
-      return
-    }
-    const optimized = optimizeSchedule(surgeries, DEFAULT_DAY, TURNOVER_MINUTES)
-    const baseline  = baselineSchedule(surgeries, DEFAULT_DAY, TURNOVER_MINUTES)
-    setSchedule({ optimized, baseline, kpis: computeKPIs(optimized, baseline, DEFAULT_DAY) })
-    setDelayedIds(new Set())
-    toast({ title: "Schedule generated" })
-  }
 
   return (
     <div className="space-y-5">
@@ -292,9 +286,6 @@ function AdminSidebar() {
         <p className="text-xs text-green-700 mt-2">
           ⏱️ Turnover: <strong>{TURNOVER_MINUTES} min</strong>
         </p>
-        <Button className="w-full mt-3 bg-green-600 hover:bg-green-700" onClick={onGenerate}>
-          🎯 Generate Optimized Schedule
-        </Button>
       </div>
     </div>
   )
@@ -303,15 +294,37 @@ function AdminSidebar() {
 // ── Main Content ──────────────────────────────────────────────────────────────
 
 function AdminMain() {
-  const { schedule, delayedIds } = useSchedule()
+  const { schedule, delayedIds, setSchedule, setDelayedIds } = useSchedule()
   const { weeklySchedule } = useWeeklySchedule()
   const { surgeries } = useSurgeries()
+  const { toast } = useToast()
   const [isWeeklyView, setIsWeeklyView] = useState(false)
 
-  // Detect conflicts on the RAW input cases (pre-optimization) so we always
-  // surface real surgeon/equipment/priority clashes — the optimized schedule
-  // resolves them by construction and would always show zero conflicts.
-  const conflictAnalysis = useMemo(() => detectInputConflicts(surgeries), [surgeries])
+  // Detect conflicts on the REAL optimized schedule times.
+  const scheduledCases = schedule?.optimized?.cases ?? []
+  const conflictAnalysis = useMemo(() => detectConflicts(scheduledCases), [scheduledCases])
+
+  const onGenerate = useCallback(() => {
+    if (!surgeries.length) {
+      toast({ title: "No surgeries", description: "Please add cases first", variant: "destructive" })
+      return
+    }
+    const optimized = optimizeSchedule(surgeries, DEFAULT_DAY, TURNOVER_MINUTES)
+    const baseline  = baselineSchedule(surgeries, DEFAULT_DAY, TURNOVER_MINUTES)
+    setSchedule({ optimized, baseline, kpis: computeKPIs(optimized, baseline, DEFAULT_DAY) })
+    setDelayedIds(new Set())
+    toast({ title: "Schedule generated" })
+  }, [surgeries, setSchedule, setDelayedIds, toast])
+
+  // Re-optimize the full surgery list and push result to store → Gantt re-renders
+  const handleResolveConflicts = useCallback(() => {
+    if (!surgeries.length) return
+    const optimized = optimizeSchedule(surgeries, DEFAULT_DAY, TURNOVER_MINUTES)
+    const baseline  = baselineSchedule(surgeries, DEFAULT_DAY, TURNOVER_MINUTES)
+    setSchedule({ optimized, baseline, kpis: computeKPIs(optimized, baseline, DEFAULT_DAY) })
+    setDelayedIds(new Set())
+    toast({ title: "Schedule regenerated", description: "Conflicts resolved — Gantt updated." })
+  }, [surgeries, setSchedule, setDelayedIds, toast])
 
   return (
     <div className="space-y-6">
@@ -330,7 +343,10 @@ function AdminMain() {
       {/* 2. Conflict Analysis */}
       <ConflictAnalysisDashboard
         conflicts={conflictAnalysis}
-        onResolveConflicts={() => {}}
+        onResolveConflicts={handleResolveConflicts}
+        scheduledCases={scheduledCases}
+        schedule={schedule}
+        setSchedule={setSchedule}
       />
 
       {/* 4. AI Insights */}
@@ -350,7 +366,10 @@ function AdminMain() {
               </p>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-3">
+            <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" onClick={onGenerate}>
+              🎯 Generate Optimized Schedule
+            </Button>
             <SharePatientUpdates />
             <div className="flex gap-2">
               <Button variant={!isWeeklyView ? "default" : "outline"} size="sm" onClick={() => setIsWeeklyView(false)}>

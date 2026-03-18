@@ -75,7 +75,7 @@ export function EmergencyInserter() {
 
     if (isWeeklyView && weeklySchedule) {
       // Handle weekly emergency scheduling
-      const currentDayIndex = new Date().getDay() - 1 // Convert to 0-6 (Monday-Sunday)
+      const currentDayIndex = (new Date().getDay() + 6) % 7 // 0=Mon … 6=Sun, safe for Sunday
       const result = scheduleEmergencyCase(emergency, weeklySchedule, Math.max(0, currentDayIndex))
       
       if (result.updatedSchedule) {
@@ -156,7 +156,7 @@ export function EmergencyInserter() {
           <DropdownInput
             name="name"
             placeholder="Procedure name"
-            options={PROCEDURE_NAMES.filter(name => name.toLowerCase().includes('emergency'))}
+            options={PROCEDURE_NAMES}
             value={formData.name}
             onChange={(value) => setFormData(prev => ({ ...prev, name: value }))}
             className="col-span-2"
@@ -182,7 +182,7 @@ export function EmergencyInserter() {
           <DropdownInput
             name="equipment"
             placeholder="Required Equipment"
-            options={EQUIPMENT.filter(equipment => equipment.toLowerCase().includes('emergency') || equipment.toLowerCase().includes('trauma'))}
+            options={EQUIPMENT}
             value={formData.equipment}
             onChange={(value) => setFormData(prev => ({ ...prev, equipment: value }))}
             className="col-span-2"
